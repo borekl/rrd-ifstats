@@ -1,0 +1,32 @@
+<!doctype html>
+
+<html>
+
+<head>
+  <title>Network traffic at [% ifname %]</title>
+  <style>
+    .bold { font-weight: bold; }
+  </style>
+</head>
+
+<body>
+
+<h1>Interface traffic at <em>[% ifname %]</em></h1>
+
+<p>Last updated: [% gentime %]</p>
+
+<p><span class="bold">Last day</span><br>
+<img src="[% ifname %]-day.png"></p>
+
+<p><span class="bold">Last week</span><br>
+<img src="[% ifname %]-week.png"></p>
+
+<p><span class="bold">Last month</span><br>
+<img src="[% ifname %]-month.png"></p>
+
+<p><span class="bold">Last year</span><br>
+<img src="[% ifname %]-year.png"></p>
+
+</body>
+
+</html>

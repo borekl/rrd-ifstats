@@ -1,0 +1,311 @@
+#!/usr/bin/perl
+
+use v5.10;
+use warnings;
+use strict;
+
+use RRDTool::OO;
+use FindBin qw($Bin);
+use Path::Tiny;
+use POSIX qw(strftime);
+use Template;
+
+#--- definitions
+
+# directory, where the rrd files will be stored; this can be absolute path,
+# relative path or undefined
+my $rrddir = 'rrd';
+
+# directory where images and HTML files will be created
+my $dstdir = 'html';
+
+# graph dimensions
+my ($img_w, $img_h) = (800, 160);
+
+
+#==============================================================================
+#=== FUNCTIONS ================================================================
+#==============================================================================
+
+sub get_location
+{
+  my $dir = shift;
+  my $path = path($Bin);
+
+  # return default path if no argument
+  return $path if !$dir;
+
+  # get absolute/relative path if argument is spefied
+  if(path($dir)->is_absolute) {
+    $path = path($dir);
+  } else {
+    $path = $path->child($dir);
+  }
+
+  # ensure the resulting path's existence
+  if(!$path->exists) {
+    die "Directory " . $path . " does not exist";
+  }
+
+  # finish
+  return $path;
+}
+
+
+#==============================================================================
+#=== MAIN =====================================================================
+#==============================================================================
+
+#--- read interface counts
+
+my %ifs;
+
+open(my $fh, '/proc/net/dev') or die 'Failed to open /proc/net/dev';
+
+<$fh>;
+<$fh>;
+
+while(my $l = <$fh>) {
+  chomp $l;
+  $l =~ s/^\s+//;
+  my @l = split(/[\s:]+/, $l);
+
+  $ifs{$l[0]} = {
+    tx => {
+      bytes => $l[9],
+      packets => $l[10],
+    },
+    rx => {
+      bytes => $l[1],
+      packets => $l[2],
+    },
+  };
+}
+
+close($fh);
+
+#--- get hostname
+
+open(F, '-|', 'hostname') || die;
+my $hostname = <F>;
+chomp($hostname);
+close(F);
+
+#--- iterate over interfaces specified on command-line
+
+my $rrdpath = get_location($rrddir);
+
+foreach my $if (@ARGV) {
+
+  # skip unknown interface
+  next if !exists $ifs{$if};
+
+  # get rrd database file
+  my $rrdfile = $rrdpath->child("$if.rrd");
+  my $rrd = RRDTool::OO->new(
+    file => $rrdfile->canonpath
+  );
+
+  # create a new RRD database if it does not exist
+  if(!$rrdfile->exists) {
+    $rrd->create(
+      step => 60,
+      data_source => {
+        name => 'tx_bytes',
+        type => 'COUNTER'
+      },
+      data_source => {
+        name => 'tx_pkts',
+        type => 'COUNTER'
+      },
+      data_source => {
+        name => 'rx_bytes',
+        type => 'COUNTER'
+      },
+      data_source => {
+        name => 'rx_pkts',
+        type => 'COUNTER'
+      },
+      # 1 week at 1 minute interval
+      archive => {
+        cpoints => 1,
+        rows => 7*24*60
+      },
+      # 1 month at 5 minute interval
+      archive => {
+        cpoints => 5,
+        rows => 30*24*12,
+        cfunc => 'AVERAGE'
+      },
+      # 1 year at 1 hour interval
+      archive => {
+        cpoints => 60,
+        rows => 24*365,
+        cfunc => 'AVERAGE'
+      },
+      # 10 years at 1 day interval
+      archive => {
+        cpoints => 1440,
+        rows => 365*10,
+        cfunc => 'AVERAGE'
+      }
+    );
+  }
+
+  #--- update RRD database
+
+  $rrd->update(
+    values => {
+      tx_bytes => $ifs{$if}{tx}{bytes},
+      rx_bytes => $ifs{$if}{rx}{bytes},
+      tx_pkts => $ifs{$if}{tx}{packets},
+      rx_pkts => $ifs{$if}{rx}{packets}
+    }
+  );
+
+  #--- create graphs
+
+  my $dst = get_location($dstdir);
+
+  my $tt = Template->new({
+    ABSOLUTE => 1,
+    ENCODING => 'utf8',
+  });
+
+  my $graph_factory = sub {
+    my ($end, $suffix) = @_;
+
+    return $rrd->graph(
+      image => $dst->child("${if}-${suffix}.png")->canonpath,
+      start => (time() - $end),
+      end => time(),
+      lower_limit => 0,
+      width => $img_w,
+      height => $img_h,
+
+      # sources
+
+      draw => {
+        type => 'hidden',
+        dsname => 'rx_bytes',
+        name => 'rx_bytes'
+      },
+      draw => {
+        type => 'hidden',
+        dsname => 'tx_bytes',
+        name => 'tx_bytes'
+      },
+
+      # convert data from bytes to bits
+
+      draw => {
+        type => 'hidden',
+        name => 'rx_bits',
+        cdef => 'rx_bytes,8,*'
+      },
+      draw => {
+        type => 'hidden',
+        name => 'tx_bits',
+        cdef => 'tx_bytes,8,*'
+      },
+
+      # record last values
+
+      draw => {
+        type => 'hidden',
+        name => 'rx_last',
+        vdef => 'rx_bits,LAST'
+      },
+      draw => {
+        type => 'hidden',
+        name => 'tx_last',
+        vdef => 'tx_bits,LAST'
+      },
+
+      # get average
+
+      draw => {
+        type => 'hidden',
+        name => 'rx_avg',
+        vdef => 'rx_bits,AVERAGE'
+      },
+      draw => {
+        type => 'hidden',
+        name => 'tx_avg',
+        vdef => 'tx_bits,AVERAGE'
+      },
+
+      # get maxima
+
+      draw => {
+        type => 'hidden',
+        name => 'rx_max',
+        vdef => 'rx_bits,MAXIMUM'
+      },
+      draw => {
+        type => 'hidden',
+        name => 'tx_max',
+        vdef => 'tx_bits,MAXIMUM'
+      },
+
+      # graw graph
+      draw => {
+        type => 'area',
+        color => '00CC00',
+        cdef => 'rx_bits',
+        legend => 'Incoming traffic'
+      },
+      gprint => {
+        draw => 'rx_last',
+        format => '\tCur %3.1lf %sbps'
+      },
+      gprint => {
+        draw => 'rx_avg',
+        format => '\tAvg %3.1lf %sbps'
+      },
+      gprint => {
+        draw => 'rx_max',
+        format => '\tMax %3.1lf %sbps\n'
+      },
+
+      draw => {
+        type => 'line',
+        thickness => 1,
+        color => '0000CC',
+        cdef => 'tx_bits',
+        legend => 'Outgoing traffic'
+      },
+      gprint => {
+        draw => 'tx_last',
+        format => '\tCur %3.1lf %sbps'
+      },
+      gprint => {
+        draw => 'tx_avg',
+        format => '\tAvg %3.1lf %sbps'
+      },
+      gprint => {
+        draw => 'tx_max',
+        format => '\tMax %3.1lf %sbps\n'
+      },
+    );
+  };
+
+  $graph_factory->(3600*24, 'day');
+  $graph_factory->(3600*24*7, 'week');
+  $graph_factory->(3600*24*30, 'month');
+  $graph_factory->(3600*24*365, 'year');
+
+  #--- create html file
+
+  $tt->process(
+    "$Bin/index.tt",
+    {
+      gentime => strftime('%c', localtime()),
+      ifname => $if,
+      hostname => $hostname
+    },
+    "$dstdir/$if.html",
+    { binmode => ':utf8' }
+  ) || die $tt->error(), "\n"
+
+}
