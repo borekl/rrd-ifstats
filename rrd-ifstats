@@ -91,50 +91,7 @@ foreach my $if (@ARGV) {
   );
 
   # create a new RRD database if it does not exist
-  if(!$rrdfile->exists) {
-    $rrd->create(
-      step => 60,
-      data_source => {
-        name => 'tx_bytes',
-        type => 'COUNTER'
-      },
-      data_source => {
-        name => 'tx_pkts',
-        type => 'COUNTER'
-      },
-      data_source => {
-        name => 'rx_bytes',
-        type => 'COUNTER'
-      },
-      data_source => {
-        name => 'rx_pkts',
-        type => 'COUNTER'
-      },
-      # 1 week at 1 minute interval
-      archive => {
-        cpoints => 1,
-        rows => 7*24*60
-      },
-      # 1 month at 5 minute interval
-      archive => {
-        cpoints => 5,
-        rows => 30*24*12,
-        cfunc => 'AVERAGE'
-      },
-      # 1 year at 1 hour interval
-      archive => {
-        cpoints => 60,
-        rows => 24*365,
-        cfunc => 'AVERAGE'
-      },
-      # 10 years at 1 day interval
-      archive => {
-        cpoints => 1440,
-        rows => 365*10,
-        cfunc => 'AVERAGE'
-      }
-    );
-  }
+  $rrd->create($cfg{rrd_db}->%*) unless $rrdfile->exists;
 
   #--- update RRD database
 
