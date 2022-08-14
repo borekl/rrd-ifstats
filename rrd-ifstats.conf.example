@@ -11,7 +11,7 @@
   height => 160,
 
   # RRD tool database definition
-  rrd_db => {
+  rrd_db => [
     step => 60,
     data_source => {
       name => 'tx_bytes',
@@ -52,5 +52,5 @@
       rows => 365*10,
       cfunc => 'AVERAGE'
     }
-  }
+  ]
 )

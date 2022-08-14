@@ -3,6 +3,7 @@
 use v5.10;
 use warnings;
 use strict;
+use experimental 'postderef';
 
 use RRDTool::OO;
 use FindBin qw($Bin);
@@ -91,9 +92,7 @@ foreach my $if (@ARGV) {
   );
 
   # create a new RRD database if it does not exist
-  $rrd->create($cfg{rrd_db}->%*) unless $rrdfile->exists;
-
-  #--- update RRD database
+  $rrd->create($cfg{rrd_db}->@*) unless $rrdfile->exists;
 
   $rrd->update(
     values => {
