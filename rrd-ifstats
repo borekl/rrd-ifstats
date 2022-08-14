@@ -50,15 +50,14 @@ die $@ unless %cfg;
 
 # read interface counts
 open(my $fh, '/proc/net/dev') or die 'Failed to open /proc/net/dev';
+chomp(my @net_dev = <$fh>);
+close($fh);
+splice(@net_dev, 0, 2);
 
-<$fh>;
-<$fh>;
-
-while(my $l = <$fh>) {
-  chomp $l;
-  $l =~ s/^\s+//;
-  my @l = split(/[\s:]+/, $l);
-
+# parse interface counts
+my %ifs;
+foreach (@net_dev) {
+  my @l = split(/[\s:]+/);
   $ifs{$l[0]} = {
     tx => {
       bytes => $l[9],
