@@ -1,0 +1,12 @@
+{
+  # directory, where the rrd files will be stored; this can be absolute path,
+  # relative path or undefined
+  rrddir => 'rrd',
+
+  # directory where images and HTML files will be created
+  dstdir => 'html',
+
+  # graph dimensions
+  width => 800,
+  height => 160,
+}

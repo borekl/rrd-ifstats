@@ -10,19 +10,6 @@ use Path::Tiny;
 use POSIX qw(strftime);
 use Template;
 
-#--- definitions
-
-# directory, where the rrd files will be stored; this can be absolute path,
-# relative path or undefined
-my $rrddir = 'rrd';
-
-# directory where images and HTML files will be created
-my $dstdir = 'html';
-
-# graph dimensions
-my ($img_w, $img_h) = (800, 160);
-
-
 #==============================================================================
 #=== FUNCTIONS ================================================================
 #==============================================================================
@@ -56,10 +43,12 @@ sub get_location
 #=== MAIN =====================================================================
 #==============================================================================
 
-#--- read interface counts
+# read configuration
+my $cfg_file = path "$Bin/rrd-ifstats.conf";
+my %cfg = eval($cfg_file->slurp);
+die $@ unless %cfg;
 
-my %ifs;
-
+# read interface counts
 open(my $fh, '/proc/net/dev') or die 'Failed to open /proc/net/dev';
 
 <$fh>;
@@ -82,18 +71,14 @@ while(my $l = <$fh>) {
   };
 }
 
-close($fh);
-
-#--- get hostname
-
-open(F, '-|', 'hostname') || die;
-my $hostname = <F>;
-chomp($hostname);
+# get hostname
+open(F, '-|', 'hostname') || die 'Failed to get hostname';
+chomp(my $hostname = <F>);
 close(F);
 
 #--- iterate over interfaces specified on command-line
 
-my $rrdpath = get_location($rrddir);
+my $rrdpath = get_location($cfg{rrddir});
 
 foreach my $if (@ARGV) {
 
@@ -165,7 +150,7 @@ foreach my $if (@ARGV) {
 
   #--- create graphs
 
-  my $dst = get_location($dstdir);
+  my $dst = get_location($cfg{dstdir});
 
   my $tt = Template->new({
     ABSOLUTE => 1,
@@ -180,8 +165,8 @@ foreach my $if (@ARGV) {
       start => (time() - $end),
       end => time(),
       lower_limit => 0,
-      width => $img_w,
-      height => $img_h,
+      width => $cfg{width},
+      height => $cfg{height},
 
       # sources
 
@@ -304,7 +289,7 @@ foreach my $if (@ARGV) {
       ifname => $if,
       hostname => $hostname
     },
-    "$dstdir/$if.html",
+    $cfg{dstdir} . "/$if.html",
     { binmode => ':utf8' }
   ) || die $tt->error(), "\n"
 
