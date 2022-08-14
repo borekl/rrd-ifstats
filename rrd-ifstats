@@ -22,7 +22,7 @@ sub get_location
   # return default path if no argument
   return $path if !$dir;
 
-  # get absolute/relative path if argument is spefied
+  # get absolute/relative path if argument is specified
   if(path($dir)->is_absolute) {
     $path = path($dir);
   } else {
