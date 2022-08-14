@@ -76,17 +76,21 @@ open(F, '-|', 'hostname') || die 'Failed to get hostname';
 chomp(my $hostname = <F>);
 close(F);
 
-#--- iterate over interfaces specified on command-line
-
+# get path where RRD databases are stored
 my $rrdpath = get_location($cfg{rrddir});
 
-foreach my $if (@ARGV) {
+# iterate over interface targets
+foreach my $target (keys $cfg{interfaces}->%*) {
 
-  # skip unknown interface
+  # get interface name
+  my $if = $cfg{interfaces}{$target};
+  die "Target '$target' has no associated interface" unless $if;
+
+  # silently skip unknown interface
   next if !exists $ifs{$if};
 
   # get rrd database file
-  my $rrdfile = $rrdpath->child("$if.rrd");
+  my $rrdfile = $rrdpath->child("$target.rrd");
   my $rrd = RRDTool::OO->new(
     file => $rrdfile->canonpath
   );
@@ -94,6 +98,7 @@ foreach my $if (@ARGV) {
   # create a new RRD database if it does not exist
   $rrd->create($cfg{rrd_db}->@*) unless $rrdfile->exists;
 
+  # update RRD database
   $rrd->update(
     values => {
       tx_bytes => $ifs{$if}{tx}{bytes},
@@ -103,8 +108,7 @@ foreach my $if (@ARGV) {
     }
   );
 
-  #--- create graphs
-
+  # create graphs
   my $dst = get_location($cfg{dstdir});
 
   my $tt = Template->new({
@@ -116,7 +120,7 @@ foreach my $if (@ARGV) {
     my ($end, $suffix) = @_;
 
     return $rrd->graph(
-      image => $dst->child("${if}-${suffix}.png")->canonpath,
+      image => $dst->child("${target}-${suffix}.png")->canonpath,
       start => (time() - $end),
       end => time(),
       lower_limit => 0,
@@ -235,16 +239,16 @@ foreach my $if (@ARGV) {
   $graph_factory->(3600*24*30, 'month');
   $graph_factory->(3600*24*365, 'year');
 
-  #--- create html file
-
+  # create html file
   $tt->process(
     "$Bin/index.tt",
     {
       gentime => strftime('%c', localtime()),
       ifname => $if,
+      target => $target,
       hostname => $hostname
     },
-    $cfg{dstdir} . "/$if.html",
+    $cfg{dstdir} . "/$target.html",
     { binmode => ':utf8' }
   ) || die $tt->error(), "\n"
 

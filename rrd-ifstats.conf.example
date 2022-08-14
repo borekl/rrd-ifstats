@@ -10,6 +10,13 @@
   width => 800,
   height => 160,
 
+  # interfaces and their aliases
+  interfaces => {
+    inet => 'enp2s0',
+    lan => 'enp3s0',
+    vpnwork => 'tun0',
+  },
+
   # RRD tool database definition
   rrd_db => [
     step => 60,

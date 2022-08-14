@@ -11,21 +11,21 @@
 
 <body>
 
-<h1>Interface traffic at <em>[% ifname %]</em></h1>
+<h1>Interface traffic at <em>[% ifname %]</em> ([% target %])</h1>
 
 <p>Last updated: [% gentime %]</p>
 
 <p><span class="bold">Last day</span><br>
-<img src="[% ifname %]-day.png"></p>
+<img src="[% target %]-day.png"></p>
 
 <p><span class="bold">Last week</span><br>
-<img src="[% ifname %]-week.png"></p>
+<img src="[% target %]-week.png"></p>
 
 <p><span class="bold">Last month</span><br>
-<img src="[% ifname %]-month.png"></p>
+<img src="[% target %]-month.png"></p>
 
 <p><span class="bold">Last year</span><br>
-<img src="[% ifname %]-year.png"></p>
+<img src="[% target %]-year.png"></p>
 
 </body>
 
