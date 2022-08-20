@@ -11,6 +11,7 @@ use Path::Tiny;
 use POSIX qw(strftime);
 use Template;
 
+
 #==============================================================================
 #=== FUNCTIONS ================================================================
 #==============================================================================
@@ -54,6 +55,9 @@ open(my $fh, '/proc/net/dev') or die 'Failed to open /proc/net/dev';
 chomp(my @net_dev = <$fh>);
 close($fh);
 splice(@net_dev, 0, 2);
+
+# remove leading whitespace
+s/^\s+// foreach (@net_dev);
 
 # parse interface counts
 my %ifs;
